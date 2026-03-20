@@ -1,0 +1,81 @@
+/* ShopTi - Base styles (UI_SPEC) */
+:root {
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-light: #DBEAFE;
+  --secondary: #10B981;
+  --secondary-hover: #059669;
+  --bg: #F9FAFB;
+  --card-bg: #FFFFFF;
+  --border: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --error: #EF4444;
+  --warning: #F59E0B;
+  --success: #22C55E;
+  --font-primary: 'Inter', Arial, sans-serif;
+  --h1: 32px;
+  --h2: 24px;
+  --h3: 20px;
+  --body: 16px;
+  --small: 14px;
+  --label: 12px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --container: 1200px;
+  --container-tablet: 900px;
+  --page-padding: 24px;
+  --card-padding: 16px;
+  --section-spacing: 48px;
+  --radius: 8px;
+  --radius-card: 12px;
+  --shadow-header: 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-card-hover: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-primary);
+  font-size: var(--body);
+  font-weight: var(--fw-regular);
+  color: var(--text-primary);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: var(--body);
+}

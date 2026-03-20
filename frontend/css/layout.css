@@ -1,0 +1,256 @@
+/* Layout - 12-column grid, containers (UI_SPEC) */
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--page-padding);
+}
+
+@media (max-width: 1024px) {
+  .container {
+    max-width: var(--container-tablet);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-4,
+  .grid-2 {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.section {
+  padding: var(--section-spacing) 0;
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-header);
+  transition: box-shadow 0.2s ease;
+}
+
+.header.scrolled {
+  box-shadow: var(--shadow-header);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--page-padding);
+}
+
+.logo {
+  font-size: var(--h3);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+}
+
+.nav a:hover {
+  color: var(--primary);
+}
+
+.nav-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.nav-cart-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cart-badge.hidden {
+  display: none !important;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Desktop: nav luôn hiện, nút menu ẩn */
+.header-nav-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.menu-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-primary);
+  transition: background 0.2s, color 0.2s;
+}
+
+.menu-toggle:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* Mobile: chỉ hiện nút menu, nav ẩn và mở khi hover (hoặc click) */
+@media (max-width: 768px) {
+  .header-nav-wrap {
+    position: relative;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    min-width: 200px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card-hover);
+    padding: 12px 0;
+    flex-direction: column;
+    gap: 0;
+    z-index: 50;
+  }
+
+  .nav a {
+    display: flex;
+    padding: 12px 16px;
+    border-radius: 0;
+  }
+
+  .nav a:hover {
+    background: var(--primary-light);
+  }
+
+  /* Chỉ mở menu khi bấm nút (tránh lỗi hiển thị do hover trên mobile/zoom) */
+  .nav.open {
+    display: flex;
+  }
+}
+
+/* Desktop (≥769px): ẩn hẳn nút menu, nav luôn hiện hàng ngang */
+@media (min-width: 769px) {
+  .menu-toggle {
+    display: none !important;
+    visibility: hidden;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  .nav {
+    display: flex !important;
+  }
+}
+
+/* Main content */
+.main {
+  min-height: calc(100vh - 64px - 120px);
+}
+
+.footer {
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  padding: 32px var(--page-padding);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--small);
+}

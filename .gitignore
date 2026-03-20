@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Environment (secrets – never commit)
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Build / deploy
+.vercel
+dist/
+build/
+*.tsbuildinfo
+
+# SQLite local DB (optional: bỏ dòng này nếu muốn commit DB mẫu)
+backend/database/*.db
+backend/database/*.db-journal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

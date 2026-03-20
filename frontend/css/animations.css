@@ -1,0 +1,53 @@
+/* Animations - skeleton, page transition (UI_SPEC) */
+@keyframes skeleton-loading {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #F3F4F6 25%,
+    #E5E7EB 37%,
+    #F3F4F6 63%
+  );
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.4s infinite;
+  border-radius: var(--radius);
+}
+
+.skeleton-text {
+  height: 16px;
+  margin-bottom: 8px;
+}
+
+.skeleton-title {
+  height: 24px;
+  width: 60%;
+  margin-bottom: 12px;
+}
+
+.skeleton-image {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+}
+
+/* Page transition */
+.page-enter {
+  opacity: 0;
+}
+
+.page-enter.active {
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Fade in content */
+.fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
