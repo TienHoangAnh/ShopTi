@@ -1,0 +1,119 @@
+/* Modal Đăng nhập / Đăng ký - flip card */
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  padding: 16px;
+  animation: auth-overlay-fade 0.25s ease;
+}
+
+.auth-modal-overlay.hidden {
+  display: none !important;
+}
+
+@keyframes auth-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.auth-flip-container {
+  width: 100%;
+  max-width: 400px;
+  perspective: 1000px;
+}
+
+.auth-flip-inner {
+  position: relative;
+  width: 100%;
+  min-height: 420px;
+  transform-style: preserve-3d;
+  transition: transform 0.5s ease;
+}
+
+.auth-flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.auth-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.auth-face-login {
+  transform: rotateY(0deg);
+}
+
+.auth-face-register {
+  transform: rotateY(180deg);
+}
+
+.auth-face-content {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  position: relative;
+  min-height: 380px;
+}
+
+.auth-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.auth-modal-close:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.auth-face-title {
+  font-size: var(--h2);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.auth-face-switch {
+  margin-top: 16px;
+  text-align: center;
+  font-size: var(--small);
+  color: var(--text-secondary);
+}
+
+.auth-switch-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.auth-switch-btn:hover {
+  color: var(--primary-hover);
+}

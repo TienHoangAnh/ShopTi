@@ -1,0 +1,100 @@
+/* Popup quảng cáo TikTok */
+.promo-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+  animation: promo-fadeIn 0.3s ease;
+}
+
+.promo-overlay.hidden {
+  display: none !important;
+}
+
+@keyframes promo-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.promo-modal {
+  position: relative;
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: promo-slideUp 0.3s ease;
+}
+
+@keyframes promo-slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.promo-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.promo-close:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.promo-icon {
+  color: #000;
+  margin-bottom: 16px;
+}
+
+.promo-icon svg {
+  display: inline-block;
+}
+
+.promo-title {
+  font-size: var(--h3);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.promo-text {
+  font-size: var(--small);
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.promo-btn {
+  display: inline-block;
+  margin: 4px;
+}
+
+.promo-btn-close {
+  margin-left: 8px;
+}
