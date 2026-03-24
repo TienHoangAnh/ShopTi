@@ -16,6 +16,7 @@
     '/profile': profilePage,
     '/register-shop': shopRegisterPage,
     '/payment/:payment_code': shopPaymentPage,
+    '/store-center': storeCenterPage,
     '/vouchers': vouchersPage,
     '/rewards': rewardsPage,
   };
@@ -1216,7 +1217,11 @@
     } catch (_) {
       store = null;
     }
-    const status = store?.store_status || user.store_status || 'none';
+    const rawStatus = store?.store_status || user.store_status || 'none';
+    const status = rawStatus === 'locked' ? 'locked' : (user?.role === 'store' ? 'approved' : rawStatus);
+    const approvedNoticeKey = user?.id ? ('shopti_store_approved_notice_seen_' + String(user.id)) : null;
+    const showApprovedNoticeOnce = status === 'approved' && !!approvedNoticeKey && localStorage.getItem(approvedNoticeKey) !== '1';
+    const showStoreBusinessCard = status !== 'approved';
     el.innerHTML = `
       <section class="section" style="max-width:500px; margin:0 auto;">
         <h1 style="font-size:var(--h2); margin-bottom:24px;">Thông tin cá nhân</h1>
@@ -1243,6 +1248,13 @@
           <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
         </form>
         <div class="card mt-5" style="padding:20px;">
+          <h2 style="font-size:var(--h3); margin-bottom:10px;">Tiện ích tài khoản</h2>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="#/rewards" class="btn btn-secondary">Kho ưu đãi</a>
+            ${user.role === 'store' ? '<a href="#/store-center" class="btn btn-secondary">Quản lý cửa hàng</a>' : ''}
+          </div>
+        </div>
+        ${showStoreBusinessCard ? `<div class="card mt-5" style="padding:20px;">
           <h2 style="font-size:var(--h3); margin-bottom:10px;">Mở cửa hàng kinh doanh</h2>
           <p class="text-secondary" style="margin-bottom:14px;">
             Trạng thái: <strong>${escapeHtml(status)}</strong>
@@ -1251,14 +1263,18 @@
           ${user.role === 'admin'
             ? `<p class="text-secondary">Admin không thể đăng ký cửa hàng.</p>`
             : status === 'approved'
-              ? `<p>Bạn đã được duyệt mở cửa hàng: <strong>${escapeHtml(store?.store_name || user.store_name || '')}</strong></p>`
+              ? `<p class="text-secondary">Cửa hàng của bạn đang hoạt động.</p>`
+              : status === 'locked'
+                ? `<p class="text-danger">Cửa hàng của bạn đã bị khóa, vui lòng liên hệ chăm sóc khách hàng để mở khóa.</p>`
+              : status === 'pending'
+                ? `<p class="text-secondary">Yêu cầu của bạn đang chờ duyệt. Sẽ mất khoảng <b>24h</b> để duyệt thông tin cửa hàng của bạn.</p>`
               : `
                   <p class="text-secondary">
-                    ${status === 'pending' ? 'Yêu cầu của bạn đang chờ duyệt.' : 'Bạn chưa có cửa hàng.'}
+                    Bạn chưa có cửa hàng.
                   </p>
                   <button type="button" class="btn btn-secondary" id="btn-open-register-shop">Đăng ký cửa hàng</button>
                 `}
-        </div>
+        </div>` : ''}
       </section>
     `;
     el.querySelector('#profile-form').addEventListener('submit', async (e) => {
@@ -1283,6 +1299,39 @@
     el.querySelector('#btn-open-register-shop')?.addEventListener('click', () => {
       window.location.hash = '#/register-shop';
     });
+
+    if (showApprovedNoticeOnce) {
+      const storeName = escapeHtml(store?.store_name || user.store_name || '');
+      const overlay = document.createElement('div');
+      overlay.style.cssText =
+        'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:11000;display:flex;align-items:center;justify-content:center;padding:18px;';
+      overlay.innerHTML = `
+        <div style="position:relative;max-width:560px;width:100%;background:#fff;border-radius:16px;padding:28px 24px 22px;box-shadow:0 24px 60px rgba(2,6,23,.35);">
+          <button type="button" id="profile-approved-close" aria-label="Đóng" style="position:absolute;top:10px;right:12px;border:none;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#64748b;">×</button>
+          <div style="text-align:center;">
+            <div style="width:62px;height:62px;border-radius:999px;background:rgba(16,185,129,.14);color:#059669;font-size:34px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">✓</div>
+            <h2 style="margin:0 0 10px;font-size:26px;color:#047857;">Chúc mừng! Cửa hàng đã được duyệt</h2>
+            <p style="margin:0 0 8px;color:#111827;">Bạn đã chính thức trở thành chủ shop trên ShopTi.</p>
+            <p style="margin:0 0 16px;"><strong>${storeName}</strong> hiện đã được kích hoạt.</p>
+            <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+              <a href="#/store-center" class="btn btn-primary" id="profile-approved-open-store">Vào quản lý cửa hàng</a>
+              <button type="button" class="btn btn-secondary" id="profile-approved-ok">Đã hiểu</button>
+            </div>
+          </div>
+        </div>
+      `;
+      function closeNotice() {
+        overlay.remove();
+        if (approvedNoticeKey) localStorage.setItem(approvedNoticeKey, '1');
+      }
+      overlay.querySelector('#profile-approved-close')?.addEventListener('click', closeNotice);
+      overlay.querySelector('#profile-approved-ok')?.addEventListener('click', closeNotice);
+      overlay.querySelector('#profile-approved-open-store')?.addEventListener('click', closeNotice);
+      overlay.addEventListener('click', (evt) => {
+        if (evt.target === overlay) closeNotice();
+      });
+      document.body.appendChild(overlay);
+    }
 
     const applyForm = el.querySelector('#store-apply-form');
     if (applyForm) {
@@ -1321,7 +1370,7 @@
       currentStore = r.store || null;
     } catch (_) {}
 
-    if (currentStore?.store_status === 'approved') {
+    if (user.role === 'store' || currentStore?.store_status === 'approved') {
       el.innerHTML = '<div class="section text-center"><p class="mb-4">Bạn đã có cửa hàng: <strong>' + escapeHtml(currentStore.store_name || '') + '</strong>.</p><a href="#/profile" class="btn btn-primary">Về trang hồ sơ</a></div>';
       return;
     }
@@ -1331,7 +1380,24 @@
         <h1 style="font-size:var(--h2); margin-bottom:16px;">Đăng ký cửa hàng</h1>
         <p class="text-secondary" style="margin-bottom:24px;">Hoàn tất thông tin để tạo mã thanh toán và kích hoạt cửa hàng. Phí kích hoạt: <strong>10,000 VND</strong>.</p>
         <div class="card" style="padding:20px;">
-          <div class="text-secondary mb-3" id="shop-step-indicator">Bước 1/3</div>
+          <div id="shop-stepper" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+              <span class="shop-step-dot" data-step="1" style="width:30px;height:30px;border-radius:999px;border:2px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#64748b;background:transparent;">1</span>
+            </div>
+            <div class="shop-step-line" style="position:relative;flex:1;height:2px;background:#e2e8f0;overflow:hidden;border-radius:999px;">
+              <div class="shop-step-line-fill" data-line="1" style="height:100%;width:0%;background:var(--primary);transition:width .28s ease;"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+              <span class="shop-step-dot" data-step="2" style="width:30px;height:30px;border-radius:999px;border:2px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#64748b;background:transparent;">2</span>
+            </div>
+            <div class="shop-step-line" style="position:relative;flex:1;height:2px;background:#e2e8f0;overflow:hidden;border-radius:999px;">
+              <div class="shop-step-line-fill" data-line="2" style="height:100%;width:0%;background:var(--primary);transition:width .28s ease;"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+              <span class="shop-step-dot" data-step="3" style="width:30px;height:30px;border-radius:999px;border:2px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#64748b;background:transparent;">3</span>
+            </div>
+          </div>
+          <div class="text-secondary mb-3" id="shop-step-indicator" style="font-size:13px;">Bước 1/3</div>
           <form id="shop-register-form">
             <div id="shop-step-1">
               <div class="form-group">
@@ -1409,6 +1475,14 @@
               <p class="text-secondary" style="margin-top:16px;">
                 Sau khi gửi, hệ thống sẽ tạo mã thanh toán <strong>10,000 VND</strong> và gửi 2 mã OTP để xác nhận đăng ký cửa hàng + xác nhận số điện thoại (demo trả OTP trong response).
               </p>
+              <div class="form-group">
+                <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
+                  <input type="checkbox" name="accept_terms" value="1" style="margin-top:4px;">
+                  <span>
+                    Tôi đồng ý điều khoản sử dụng của nền tảng và chịu trách nhiệm nếu có bất kỳ hành vi vi phạm trong hoạt động kinh doanh.
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div style="display:flex; gap:12px; margin-top:18px; align-items:center;">
@@ -1426,6 +1500,8 @@
     const step2 = el.querySelector('#shop-step-2');
     const step3 = el.querySelector('#shop-step-3');
     const indicator = el.querySelector('#shop-step-indicator');
+    const stepDots = [...el.querySelectorAll('.shop-step-dot')];
+    const stepLineFills = [...el.querySelectorAll('.shop-step-line-fill')];
     const backBtn = el.querySelector('#btn-shop-back');
     const actionBtn = el.querySelector('#btn-shop-action');
 
@@ -1436,6 +1512,16 @@
       step2.classList.toggle('hidden', n !== 2);
       step3.classList.toggle('hidden', n !== 3);
       indicator.textContent = `Bước ${n}/3`;
+      stepDots.forEach((dot, idx) => {
+        const active = idx + 1 === n;
+        dot.style.background = active ? 'var(--primary)' : 'transparent';
+        dot.style.borderColor = active ? 'var(--primary)' : '#cbd5e1';
+        dot.style.color = active ? '#ffffff' : '#64748b';
+      });
+      stepLineFills.forEach((lineFill, idx) => {
+        const shouldFill = n > idx + 1;
+        lineFill.style.width = shouldFill ? '100%' : '0%';
+      });
       backBtn.style.display = n === 1 ? 'none' : '';
       actionBtn.textContent = n === 3 ? 'Tạo mã thanh toán (10,000 VND)' : 'Tiếp theo';
     }
@@ -1469,7 +1555,9 @@
         const bank_account_name = getInputValue('bank_account_name');
         const bank_account_number = getInputValue('bank_account_number');
         const bank_name = getInputValue('bank_name');
+        const accepted = !!form.querySelector('input[name="accept_terms"]:checked');
         if (!bank_account_name || !bank_account_number || !bank_name) return ui.alert('Vui lòng nhập đủ thông tin ngân hàng', 'error');
+        if (!accepted) return ui.alert('Vui lòng đồng ý điều khoản sử dụng', 'error');
         return true;
       }
       return false;
@@ -1508,7 +1596,7 @@
         const res = await api.post('/store/register', body);
         if (!res.payment?.payment_code) throw new Error('Không tạo được mã thanh toán');
         const code = res.payment.payment_code;
-        if (res.debug?.store_registration_otp && res.debug?.phone_verification_otp) {
+        if (res.debug && typeof res.debug === 'object') {
           localStorage.setItem('shopti_debug_otps_' + code, JSON.stringify(res.debug));
         }
         ui.alert('Đã tạo mã thanh toán. Vui lòng chuyển khoản 10,000 VND.', 'success');
@@ -1535,55 +1623,179 @@
       const res = await api.get('/store/payment/' + encodeURIComponent(paymentCode));
       const payment = res.payment || {};
       const bank = payment.bank_info || {};
-      const debug = JSON.parse(localStorage.getItem('shopti_debug_otps_' + paymentCode) || 'null');
+      const debug = JSON.parse(localStorage.getItem('shopti_debug_otps_' + paymentCode) || 'null') || {};
       const expired = payment.expires_at ? new Date(payment.expires_at).getTime() < Date.now() : false;
 
       el.innerHTML = `
-        <section class="section" style="max-width:720px; margin:0 auto;">
+        <section class="section" style="max-width:1180px; margin:0 auto;">
+          <style>
+            .shop-pay-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+            @media (max-width: 900px) { .shop-pay-layout { grid-template-columns:1fr; } }
+          </style>
           <h1 style="font-size:var(--h2); margin-bottom:16px;">Thanh toán để kích hoạt cửa hàng</h1>
-          <div class="card" style="padding:20px;">
-            <p><strong>Số tiền:</strong> ${Number(payment.amount || 0).toLocaleString('vi-VN')} VND</p>
-            <p><strong>Trạng thái:</strong> <span class="text-secondary">${escapeHtml(payment.status || 'pending')}</span></p>
-            <p><strong>Mã thanh toán:</strong> ${escapeHtml(paymentCode)}</p>
-            <p><strong>Nội dung chuyển khoản:</strong> <code style="display:inline-block; padding:6px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px;">${escapeHtml(payment.transfer_content || ('PAY ' + paymentCode))}</code></p>
-            <hr style="border:none;border-top:1px solid var(--border); margin:16px 0;">
-            <h2 style="font-size:var(--h3); margin-bottom:10px;">Thông tin ngân hàng</h2>
-            <p><strong>Ngân hàng:</strong> ${escapeHtml(bank.bank_name || '')}</p>
-            <p><strong>Tên tài khoản:</strong> ${escapeHtml(bank.account_name || '')}</p>
-            <p><strong>Số tài khoản:</strong> ${escapeHtml(bank.account_number || '')}</p>
+          <div class="shop-pay-layout">
+            <div class="card" style="padding:20px;">
+              <h2 style="font-size:var(--h3); margin-bottom:12px;">Quét QR để chuyển khoản</h2>
+              ${bank.qr_image_url ? `
+                <div style="display:flex; align-items:center; justify-content:center; background:#f8fafc; border:1px solid var(--border); border-radius:14px; padding:16px;">
+                  <img src="${escapeHtml(bank.qr_image_url)}" alt="QR chuyển khoản ngân hàng" style="max-width:420px; width:100%; border:1px solid var(--border); border-radius:12px;">
+                </div>
+              ` : `
+                <div style="padding:18px; border-radius:12px; border:1px dashed var(--border); background:var(--bg); color:var(--text-secondary);">
+                  Chưa có ảnh QR ngân hàng. Vui lòng dùng thông tin tài khoản bên phải để chuyển khoản.
+                </div>
+              `}
+              <div style="margin-top:14px; background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px;">
+                <p style="margin:0 0 8px;"><strong>Nội dung chuyển khoản</strong></p>
+                <code style="display:inline-block; padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius:8px;">${escapeHtml(payment.transfer_content || ('PAY ' + paymentCode))}</code>
+                <p class="text-secondary" style="margin:8px 0 0; font-size:13px;">Chuyển khoản đúng số tiền và đúng nội dung để hệ thống đối soát.</p>
+              </div>
+            </div>
 
-            <div class="mt-4">
-              <h2 style="font-size:var(--h3); margin-bottom:10px;">Xác nhận OTP</h2>
-              <p class="text-secondary" style="margin-bottom:12px; font-size:var(--label);">Nhập 2 mã OTP để xác nhận đăng ký cửa hàng và xác nhận số điện thoại. (Demo: tự động lấy từ response trong localStorage nếu có.)</p>
-              <div class="form-group">
+            <div class="card" style="padding:20px;">
+              <h2 style="font-size:var(--h3); margin-bottom:10px;">Thông tin thanh toán</h2>
+              <p><strong>Số tiền:</strong> ${Number(payment.amount || 0).toLocaleString('vi-VN')} VND</p>
+              <p><strong>Trạng thái:</strong> <span class="text-secondary">${escapeHtml(payment.status || 'pending')}</span></p>
+              <p><strong>Mã thanh toán:</strong> ${escapeHtml(paymentCode)}</p>
+              <p><strong>Ngân hàng:</strong> ${escapeHtml(bank.bank_name || '')}</p>
+              <p><strong>Tên tài khoản:</strong> ${escapeHtml(bank.account_name || '')}</p>
+              <p><strong>Số tài khoản:</strong> ${escapeHtml(bank.account_number || '')}</p>
+              <hr style="border:none;border-top:1px solid var(--border); margin:16px 0;">
+
+              <h2 style="font-size:var(--h3); margin-bottom:10px;">Xác nhận thanh toán</h2>
+              <p class="text-secondary" style="margin-bottom:12px; font-size:var(--label);">Bước 1: nhập đúng nội dung chuyển khoản sau khi bạn đã quét QR/chuyển khoản. Khi đúng, hệ thống mới gửi OTP #2 (demo).</p>
+              <div class="form-group" id="transfer-step-wrap">
+                <label class="form-label">Nội dung chuyển khoản bạn đã dùng</label>
+                <input type="text" name="transfer_content_input" class="form-input" value="${escapeHtml(payment.transfer_content || ('PAY ' + paymentCode))}" placeholder="Nhập đúng nội dung chuyển khoản">
+                <div style="margin-top:10px;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-mark-paid" ${expired ? 'disabled' : ''}>Tôi đã thanh toán</button>
+                </div>
+              </div>
+
+              <div id="otp-section" class="hidden">
+                <p class="text-secondary" style="margin-bottom:12px; font-size:var(--label);">Bước 2: xác nhận OTP #1 rồi mới được nhập OTP #2.</p>
+                <div class="form-group" id="otp-step-1-wrap">
                 <label class="form-label">Mã đăng ký cửa hàng (OTP #1)</label>
                 <input type="text" name="store_registration_otp" class="form-input" value="${escapeHtml(debug?.store_registration_otp || '')}" placeholder="Nhập OTP #1">
+                <div style="margin-top:10px;">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-verify-otp1" ${expired ? 'disabled' : ''}>Xác nhận OTP #1</button>
+                </div>
+                </div>
+                <div class="form-group hidden" id="otp-step-2-wrap">
+                  <label class="form-label">Mã xác nhận số điện thoại (OTP #2)</label>
+                  <input type="text" name="phone_verification_otp" class="form-input" value="${escapeHtml(debug?.phone_verification_otp || '')}" placeholder="Nhập OTP #2">
+                </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Mã xác nhận số điện thoại (OTP #2)</label>
-                <input type="text" name="phone_verification_otp" class="form-input" value="${escapeHtml(debug?.phone_verification_otp || '')}" placeholder="Nhập OTP #2">
-              </div>
-            </div>
 
-            <div style="display:flex; gap:12px; margin-top:18px; align-items:center;">
-              <button type="button" class="btn btn-primary" id="btn-confirm-payment" ${expired ? 'disabled' : ''}>Tôi đã thanh toán (kích hoạt)</button>
-              <a href="#/profile" class="btn btn-secondary">Về hồ sơ</a>
+              <div style="display:flex; gap:12px; margin-top:18px; align-items:center;" id="payment-actions">
+                <button type="button" class="btn btn-primary hidden" id="btn-confirm-payment" ${expired ? 'disabled' : ''}>Gửi yêu cầu mở cửa hàng</button>
+                <a href="#/profile" class="btn btn-secondary">Về hồ sơ</a>
+              </div>
+              ${expired ? `<p class="text-secondary mt-3">Mã thanh toán đã hết hạn. Vui lòng đăng ký lại.</p>` : ''}
             </div>
-            ${expired ? `<p class="text-secondary mt-3">Mã thanh toán đã hết hạn. Vui lòng đăng ký lại.</p>` : ''}
           </div>
         </section>
       `;
 
+      let otp1Verified = false;
+      const cardRoot = el.querySelector('.card');
+      const transferInput = cardRoot?.querySelector('input[name="transfer_content_input"]');
+      const otp1Input = cardRoot?.querySelector('input[name="store_registration_otp"]');
+      const otp2Input = cardRoot?.querySelector('input[name="phone_verification_otp"]');
+      const otpSection = el.querySelector('#otp-section');
+      const otp2Wrap = el.querySelector('#otp-step-2-wrap');
+      const markPaidBtn = el.querySelector('#btn-mark-paid');
+      const verifyOtp1Btn = el.querySelector('#btn-verify-otp1');
+      const confirmBtn = el.querySelector('#btn-confirm-payment');
+      const expectedTransfer = String(payment.transfer_content || '').trim();
+
+      function revealStep2() {
+        otp1Verified = true;
+        otp2Wrap?.classList.remove('hidden');
+        confirmBtn?.classList.remove('hidden');
+        if (otp1Input) otp1Input.readOnly = true;
+        verifyOtp1Btn?.setAttribute('disabled', 'disabled');
+        verifyOtp1Btn && (verifyOtp1Btn.textContent = 'OTP #1 đã xác nhận');
+        otp2Input?.focus();
+      }
+
+      function revealOtpSection() {
+        otpSection?.classList.remove('hidden');
+      }
+
+      markPaidBtn?.addEventListener('click', async () => {
+        const transferContentInput = (transferInput?.value || '').trim();
+        if (!transferContentInput) {
+          ui.alert('Vui lòng nhập nội dung chuyển khoản', 'error');
+          return;
+        }
+        if (expectedTransfer && transferContentInput !== expectedTransfer) {
+          ui.alert('Nội dung chuyển khoản không đúng', 'error');
+          return;
+        }
+        try {
+          const verifyRes = await api.post('/store/payment/verify-transfer', {
+            payment_code: paymentCode,
+            transfer_content: transferContentInput,
+          });
+          if (verifyRes.debug && typeof verifyRes.debug === 'object') {
+            const merged = { ...debug, ...verifyRes.debug };
+            localStorage.setItem('shopti_debug_otps_' + paymentCode, JSON.stringify(merged));
+            if (otp2Input) otp2Input.value = merged.phone_verification_otp || otp2Input.value;
+          }
+          markPaidBtn.setAttribute('disabled', 'disabled');
+          markPaidBtn.textContent = 'Đã ghi nhận thanh toán';
+          if (transferInput) transferInput.readOnly = true;
+          revealOtpSection();
+          otp1Input?.focus();
+          ui.alert(verifyRes.message || 'Đã ghi nhận thanh toán', 'success');
+        } catch (e) {
+          ui.alert(e.message || 'Không xác nhận được thanh toán', 'error');
+        }
+      });
+
+      verifyOtp1Btn?.addEventListener('click', () => {
+        const otp1 = (otp1Input?.value || '').trim();
+        if (!otp1) {
+          ui.alert('Vui lòng nhập OTP #1', 'error');
+          return;
+        }
+        const cached = JSON.parse(localStorage.getItem('shopti_debug_otps_' + paymentCode) || 'null') || {};
+        if (cached?.store_registration_otp && otp1 !== String(cached.store_registration_otp)) {
+          ui.alert('OTP #1 không đúng', 'error');
+          return;
+        }
+        revealStep2();
+      });
+
+      if (payment.user_marked_paid_at || payment.has_phone_otp) {
+        revealOtpSection();
+        markPaidBtn?.setAttribute('disabled', 'disabled');
+        markPaidBtn && (markPaidBtn.textContent = 'Đã ghi nhận thanh toán');
+        if (transferInput) transferInput.readOnly = true;
+      }
+
       el.querySelector('#btn-confirm-payment')?.addEventListener('click', async () => {
         try {
-          const root = el.querySelector('.card');
-          const store_registration_otp = root.querySelector('input[name=\"store_registration_otp\"]').value.trim();
-          const phone_verification_otp = root.querySelector('input[name=\"phone_verification_otp\"]').value.trim();
+          const cached = JSON.parse(localStorage.getItem('shopti_debug_otps_' + paymentCode) || 'null') || {};
+          if (!otp1Verified) {
+            ui.alert('Vui lòng xác nhận OTP #1 trước', 'error');
+            return;
+          }
+          const store_registration_otp = (otp1Input?.value || '').trim();
+          const phone_verification_otp = (otp2Input?.value || '').trim();
+          if (!phone_verification_otp) {
+            ui.alert('Vui lòng nhập OTP #2', 'error');
+            return;
+          }
+          if (cached?.phone_verification_otp && phone_verification_otp !== String(cached.phone_verification_otp)) {
+            ui.alert('OTP #2 không đúng', 'error');
+            return;
+          }
           const payload = { payment_code: paymentCode, store_registration_otp, phone_verification_otp };
           const r2 = await api.post('/store/payment/simulate-success', payload);
-          if (!r2.success) throw new Error(r2.message || 'Kích hoạt thất bại');
-          localStorage.removeItem('shopti_debug_otps_' + paymentCode);
-          ui.alert('Kích hoạt cửa hàng thành công!', 'success');
+          if (!r2.success) throw new Error(r2.message || 'Gửi yêu cầu thất bại');
+          ui.alert(r2.message || 'Đã gửi yêu cầu chờ admin duyệt mở cửa hàng', 'success');
           window.location.hash = '#/profile';
         } catch (e) {
           ui.alert(e.message || 'Xác nhận thất bại', 'error');
@@ -1592,6 +1804,53 @@
     } catch (e) {
       el.innerHTML = '<div class="section text-center"><p class="mb-4">' + escapeHtml(e.message || 'Không tải được thanh toán') + '</p><a href="#/profile" class="btn btn-primary">Quay lại</a></div>';
     }
+  }
+
+  async function storeCenterPage(el) {
+    if (!auth.token) {
+      el.innerHTML = '<div class="section text-center"><p class="mb-4">Vui lòng đăng nhập.</p><a href="#/" data-auth-modal="login" class="btn btn-primary">Đăng nhập</a></div>';
+      return;
+    }
+    const user = await auth.me();
+    if (user.role !== 'store') {
+      el.innerHTML = '<div class="section text-center"><p class="mb-4">Trang này dành cho tài khoản chủ shop đã được duyệt.</p><a href="#/profile" class="btn btn-primary">Về hồ sơ</a></div>';
+      return;
+    }
+    let store = null;
+    try {
+      const r = await api.get('/store/me');
+      store = r.store || null;
+    } catch (_) {
+      store = null;
+    }
+    if (store?.store_status === 'locked' || user.store_status === 'locked') {
+      el.innerHTML = '<div class="section text-center"><p class="mb-4">Cửa hàng của bạn đã bị khóa, vui lòng liên hệ chăm sóc khách hàng để mở khóa.</p><a href="#/profile" class="btn btn-primary">Về hồ sơ</a></div>';
+      return;
+    }
+    el.innerHTML = `
+      <section class="section" style="max-width:760px; margin:0 auto;">
+        <div class="card" style="padding:24px;">
+          <h1 style="font-size:var(--h2); margin-bottom:12px;">Chào mừng chủ shop!</h1> 
+          <p class="text-secondary" style="margin-bottom:0;">
+            Tài khoản của bạn đã là <strong>store</strong>. Khu vực quản lý cửa hàng sẽ được mở rộng ở phiên bản tiếp theo.
+          </p>
+          <div style="margin-top:16px; border:1px solid #facc15; background:#fffbeb; border-radius:12px; padding:14px 16px;">
+            <p style="margin:0 0 8px; font-weight:800; color:#92400e;">
+              Thông báo: Trang quản lý cửa hàng đang được hoàn thiện
+            </p>
+            <p class="text-secondary" style="margin:0 0 10px; font-size:14px;">
+              Các tính năng dưới đây sẽ sớm được cập nhật trong các bản tiếp theo:
+            </p>
+            <ul style="margin:0; padding-left:18px; color:#374151; font-size:14px; line-height:1.6;">
+              <li>Quản lý sản phẩm và tồn kho theo shop</li>
+              <li>Theo dõi đơn hàng và xử lý giao hàng</li>
+              <li>Xem thống kê doanh thu riêng của shop</li>
+              <li>Quản lý voucher/khuyến mãi theo cửa hàng</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    `;
   }
 
   async function vouchersPage(el) {

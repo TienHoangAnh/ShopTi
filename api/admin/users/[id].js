@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
     }
 
     if (method === 'GET') {
-      const user = await User.findById(id).select('_id email full_name role createdAt').lean();
+      const user = await User.findById(id).select('_id email full_name role store_status createdAt').lean();
       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
       return res.json({
         success: true,
@@ -34,6 +34,7 @@ module.exports = async (req, res) => {
           email: user.email,
           full_name: user.full_name,
           role: user.role,
+          store_status: user.store_status || 'none',
           created_at: user.createdAt,
         },
       });
@@ -43,14 +44,14 @@ module.exports = async (req, res) => {
       const { full_name, role } = req.body || {};
       const existing = await User.findById(id);
       if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
-      if (role && !['user', 'admin'].includes(role)) {
+      if (role && !['user', 'store', 'admin'].includes(role)) {
         return res.status(400).json({ success: false, message: 'Invalid role' });
       }
       const updates = {};
       if (full_name !== undefined) updates.full_name = full_name;
       if (role !== undefined) updates.role = role;
       const user = await User.findByIdAndUpdate(id, { $set: updates }, { new: true })
-        .select('_id email full_name role createdAt')
+        .select('_id email full_name role store_status createdAt')
         .lean();
       return res.json({
         success: true,
@@ -59,6 +60,7 @@ module.exports = async (req, res) => {
           email: user.email,
           full_name: user.full_name,
           role: user.role,
+          store_status: user.store_status || 'none',
           created_at: user.createdAt,
         },
       });

@@ -27,6 +27,9 @@ const auth = {
   isAdmin() {
     return (this.user && this.user.role === 'admin') || false;
   },
+  isStore() {
+    return (this.user && this.user.role === 'store') || false;
+  },
   async register(email, password, full_name) {
     const res = await api.post('/auth/register', { email, password, full_name });
     auth.token = res.token;

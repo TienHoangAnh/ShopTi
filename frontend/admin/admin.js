@@ -39,6 +39,7 @@
       else if (page === 'products') await renderProducts();
       else if (page === 'orders') await renderOrders();
       else if (page === 'users') await renderUsers();
+      else if (page === 'store-requests-history') await renderStoreRequestsHistory();
       else if (page === 'vouchers') await renderVouchers();
     } catch (e) {
       if (e.message && e.message.includes('Admin')) {
@@ -50,18 +51,151 @@
   }
 
   async function renderDashboard() {
-    const res = await api.get('/admin/dashboard');
+    const mode = String(window.__dashboardMode || 'month');
+    const year = Number(window.__dashboardYear || new Date().getFullYear());
+    const month = Number(window.__dashboardMonth || (new Date().getMonth() + 1));
+    const qs = new URLSearchParams({ mode, year: String(year), month: String(month) });
+    const res = await api.get('/admin/dashboard?' + qs.toString());
     const d = res.dashboard;
+
+    function money(n) {
+      return '$' + Number(n || 0).toFixed(2);
+    }
+
+    function formatVnd(n) {
+      return Number(n || 0).toLocaleString('vi-VN') + ' VND';
+    }
+
+    function getLinePoints(series, width, height, padX, padY) {
+      if (!series || !series.length) return [];
+      const maxVal = Math.max(...series, 1);
+      const stepX = series.length > 1 ? (width - padX * 2) / (series.length - 1) : 0;
+      return series.map((v, i) => {
+        const x = padX + i * stepX;
+        const y = height - padY - ((Number(v || 0) / maxVal) * (height - padY * 2));
+        return { x, y, v: Number(v || 0) };
+      });
+    }
+
+    function buildLinePath(points) {
+      if (!points.length) return '';
+      return points
+        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+        .join(' ');
+    }
+
+    function buildCountBoxes(labels, series) {
+      if (!labels.length) return '';
+      return labels
+        .map((lb, i) => {
+          const v = Number(series[i] || 0);
+          const isActive = v > 0;
+          return `<div title="${esc(lb)}: ${v}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:52px;min-height:56px;padding:6px 8px;border-radius:10px;border:1px solid ${isActive ? '#34d399' : '#d1d5db'};background:${isActive ? '#ecfdf5' : '#f8fafc'};">
+            <strong style="font-size:16px;line-height:1;color:${isActive ? '#047857' : '#111827'};">${v}</strong>
+            <span style="font-size:11px;color:#64748b;">${esc(lb)}</span>
+          </div>`;
+        })
+        .join('');
+    }
+
+    const fallbackLabels =
+      mode === 'year'
+        ? Array.from({ length: 12 }, (_, i) => `T${i + 1}`)
+        : Array.from({ length: new Date(year, month, 0).getDate() }, (_, i) => String(i + 1).padStart(2, '0'));
+    const labels = (Array.isArray(d.chart?.labels) && d.chart.labels.length) ? d.chart.labels : fallbackLabels;
+    const revenueSeriesRaw = Array.isArray(d.chart?.revenueSeries) ? d.chart.revenueSeries : [];
+    const registrationSeriesRaw = Array.isArray(d.chart?.registrationSeries) ? d.chart.registrationSeries : [];
+    const revenueSeries = labels.map((_, i) => Number(revenueSeriesRaw[i] || 0));
+    const registrationSeries = labels.map((_, i) => Number(registrationSeriesRaw[i] || 0));
+    const yMax = Math.max(...revenueSeries, 1);
+    const yTicks = 5;
+    const yTickValues = Array.from({ length: yTicks + 1 }, (_, i) => (yMax / yTicks) * (yTicks - i));
+    const plotTop = 20;
+    const plotBottom = 200;
+    const plotLeft = 56;
+    const plotRight = 796;
+    const revenuePoints = getLinePoints(revenueSeries, 820, 220, plotLeft, 20);
+    const revenuePath = buildLinePath(revenuePoints);
+    const revenueAreaPath = revenuePoints.length
+      ? `${revenuePath} L ${revenuePoints[revenuePoints.length - 1].x.toFixed(2)} 200 L ${revenuePoints[0].x.toFixed(2)} 200 Z`
+      : '';
+    const hasRevenueData = revenueSeries.some((x) => Number(x) > 0);
+    const hasRegistrationData = registrationSeries.some((x) => Number(x) > 0);
+
     content.innerHTML = `
-      <h1>Dashboard</h1>
+      <h1 style="margin-bottom:14px;">Platform Dashboard</h1>
+      <div class="card" style="padding:14px; margin-bottom:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:linear-gradient(90deg,#0f172a,#1d4ed8); color:#fff;">
+        <strong style="font-size:14px;">Bộ lọc biểu đồ:</strong>
+        <select class="form-input" id="dash-mode" style="width:auto; min-width:110px; background:#fff; color:#111827;">
+          <option value="month" ${mode === 'month' ? 'selected' : ''}>Theo tháng</option>
+          <option value="year" ${mode === 'year' ? 'selected' : ''}>Theo năm</option>
+        </select>
+        <input class="form-input" id="dash-year" type="number" min="2020" max="2100" value="${year}" style="width:110px; background:#fff; color:#111827;">
+        <select class="form-input" id="dash-month" style="width:auto; min-width:90px; background:#fff; color:#111827; ${mode === 'year' ? 'display:none;' : ''}">
+          ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${month === i + 1 ? 'selected' : ''}>Tháng ${i + 1}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary" id="dash-apply-filter">Áp dụng</button>
+      </div>
       <div class="stats-grid">
-        <div class="stat-card"><div class="value">${d.completedOrders ?? 0}</div><div class="label">Đơn hoàn thành</div></div>
-        <div class="stat-card"><div class="value">${d.cancelledOrders ?? 0}</div><div class="label">Đơn hủy</div></div>
-        <div class="stat-card"><div class="value">$${Number(d.totalRevenueEstimated ?? 0).toFixed(2)}</div><div class="label">Doanh thu ước tính (tất cả đơn)</div></div>
-        <div class="stat-card"><div class="value">$${Number(d.actualRevenue ?? 0).toFixed(2)}</div><div class="label">Doanh thu thực tế (đơn hoàn thành)</div></div>
-        <div class="stat-card"><div class="value">${d.totalOrders}</div><div class="label">Tổng đơn</div></div>
-        <div class="stat-card"><div class="value">${d.totalProducts}</div><div class="label">Sản phẩm</div></div>
-        <div class="stat-card"><div class="value">${d.totalUsers}</div><div class="label">Users</div></div>
+        <div class="stat-card"><div class="value">${d.totalUsers ?? 0}</div><div class="label">Tổng người dùng nền tảng</div></div>
+        <div class="stat-card"><div class="value">${d.trustedUsers ?? 0}</div><div class="label">Người dùng tin tưởng (đã mua thành công)</div></div>
+        <div class="stat-card"><div class="value">${d.productsSold ?? 0}</div><div class="label">Sản phẩm đã bán trên nền tảng</div></div>
+        <div class="stat-card"><div class="value">${money(d.currentMonthRevenue)}</div><div class="label">Doanh thu tháng hiện tại</div></div>
+        <div class="stat-card"><div class="value">${d.storeApplicants ?? 0}</div><div class="label">Người dùng đăng ký mở cửa hàng</div></div>
+        <div class="stat-card"><div class="value">${d.totalStores ?? 0}</div><div class="label">Tổng số cửa hàng</div></div>
+        <div class="stat-card"><div class="value">${d.activeStores ?? 0}</div><div class="label">Cửa hàng đang hoạt động</div></div>
+        <div class="stat-card"><div class="value">${d.registrationsThisMonth ?? 0}</div><div class="label">Đăng ký shop tháng này</div></div>
+        <div class="stat-card"><div class="value">${money(d.actualRevenue)}</div><div class="label">Doanh thu đơn hoàn thành (toàn nền tảng)</div></div>
+        <div class="stat-card"><div class="value">${money(d.filtered?.deliveredRevenue)}</div><div class="label">Doanh thu theo bộ lọc</div></div>
+        <div class="stat-card"><div class="value">${formatVnd(d.shopActivationRevenueVnd)}</div><div class="label">Doanh thu kích hoạt shop</div></div>
+        <div class="stat-card"><div class="value">${d.filtered?.registrations ?? 0}</div><div class="label">Đăng ký shop theo bộ lọc</div></div>
+      </div>
+      <div class="card" style="padding:16px; margin-bottom:16px;">
+        <h2 class="mb-3" style="font-size:18px;">Biểu đồ doanh thu nền tảng (${mode === 'year' ? 'theo tháng trong năm' : 'theo ngày trong tháng'})</h2>
+        <div style="width:100%; overflow-x:auto;">
+          <svg viewBox="0 0 820 260" style="min-width:820px;width:100%;height:260px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+            <defs>
+              <linearGradient id="revenue-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#2563eb" stop-opacity="0.22"></stop>
+                <stop offset="100%" stop-color="#2563eb" stop-opacity="0.02"></stop>
+              </linearGradient>
+            </defs>
+            ${yTickValues
+              .map((v, i) => {
+                const y = plotTop + ((plotBottom - plotTop) * i) / yTicks;
+                return `<line x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1"></line>
+                  <text x="${plotLeft - 8}" y="${y + 4}" text-anchor="end" fill="#64748b" font-size="11">$${Number(v).toFixed(0)}</text>`;
+              })
+              .join('')}
+            <line x1="${plotLeft}" y1="${plotTop}" x2="${plotLeft}" y2="${plotBottom}" stroke="#94a3b8" stroke-width="1.2"></line>
+            <line x1="${plotLeft}" y1="${plotBottom}" x2="${plotRight}" y2="${plotBottom}" stroke="#94a3b8" stroke-width="1.2"></line>
+            ${hasRevenueData ? `<path d="${revenueAreaPath}" fill="url(#revenue-fill)"></path>` : ''}
+            <path d="${revenuePath}" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+            ${hasRevenueData
+              ? revenuePoints
+                  .filter((p) => p.v > 0)
+                  .map((p) => `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.6" fill="#2563eb" stroke="#ffffff" stroke-width="2"></circle>`)
+                  .join('')
+              : ''}
+            ${(labels || [])
+              .map((lb, i) => {
+                if (!(mode === 'year' || i === 0 || i === labels.length - 1 || (i + 1) % 2 === 0)) return '';
+                const x = plotLeft + ((plotRight - plotLeft) * i) / Math.max(labels.length - 1, 1);
+                return `<text x="${x}" y="${plotBottom + 16}" text-anchor="middle" fill="#64748b" font-size="10">${esc(lb)}</text>`;
+              })
+              .join('')}
+            <text x="${(plotLeft + plotRight) / 2}" y="252" text-anchor="middle" fill="#475569" font-size="11">${mode === 'year' ? 'Tháng trong năm' : 'Ngày trong tháng'}</text>
+            <text x="16" y="14" fill="#475569" font-size="11">Số tiền (USD)</text>
+            ${!hasRevenueData ? '<text x="430" y="115" text-anchor="middle" fill="#94a3b8" font-size="14">Chưa có dữ liệu doanh thu trong kỳ lọc</text>' : ''}
+          </svg>
+        </div>
+      </div>
+      <div class="card" style="padding:16px; margin-bottom:16px;">
+        <h2 class="mb-3" style="font-size:18px;">Lượt đăng ký cửa hàng (${mode === 'year' ? 'theo tháng' : 'theo ngày'})</h2>
+        <div style="display:flex;gap:8px;align-items:stretch;overflow-x:auto;padding-bottom:6px;">
+          ${buildCountBoxes(labels, registrationSeries)}
+        </div>
+        ${!hasRegistrationData ? '<p class="text-secondary" style="font-size:13px;margin-top:8px;">Chưa có dữ liệu đăng ký cửa hàng trong kỳ lọc.</p>' : ''}
       </div>
       <h2 class="mb-3" style="font-size:18px;">Recent orders</h2>
       <table class="admin-table">
@@ -79,6 +213,23 @@
         </tbody>
       </table>
     `;
+
+    const modeEl = content.querySelector('#dash-mode');
+    const yearEl = content.querySelector('#dash-year');
+    const monthEl = content.querySelector('#dash-month');
+    modeEl?.addEventListener('change', () => {
+      if (!monthEl) return;
+      monthEl.style.display = modeEl.value === 'year' ? 'none' : '';
+    });
+    content.querySelector('#dash-apply-filter')?.addEventListener('click', () => {
+      const nextMode = modeEl?.value === 'year' ? 'year' : 'month';
+      const nextYear = Number.parseInt(yearEl?.value || String(new Date().getFullYear()), 10) || new Date().getFullYear();
+      const nextMonth = Number.parseInt(monthEl?.value || String(new Date().getMonth() + 1), 10) || (new Date().getMonth() + 1);
+      window.__dashboardMode = nextMode;
+      window.__dashboardYear = nextYear;
+      window.__dashboardMonth = nextMonth;
+      renderDashboard();
+    });
   }
 
   async function renderProducts() {
@@ -305,12 +456,20 @@
   }
 
   async function renderUsers() {
-    const res = await api.get('/admin/users');
-    const list = res.users || [];
+    const roleFilter = String(window.__adminUserRoleFilter || 'all');
+    const userRes = await api.get('/admin/users' + (roleFilter === 'all' ? '' : ('?role=' + encodeURIComponent(roleFilter))));
+    const list = userRes.users || [];
     content.innerHTML = `
       <h1>Users</h1>
+      <div class="card" style="padding:12px; margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <strong>Lọc vai trò:</strong>
+        <button type="button" class="btn btn-sm ${roleFilter === 'all' ? 'btn-primary' : 'btn-secondary'} user-filter" data-role="all">Tất cả</button>
+        <button type="button" class="btn btn-sm ${roleFilter === 'user' ? 'btn-primary' : 'btn-secondary'} user-filter" data-role="user">user</button>
+        <button type="button" class="btn btn-sm ${roleFilter === 'store' ? 'btn-primary' : 'btn-secondary'} user-filter" data-role="store">store</button>
+        <button type="button" class="btn btn-sm ${roleFilter === 'admin' ? 'btn-primary' : 'btn-secondary'} user-filter" data-role="admin">admin</button>
+      </div>
       <table class="admin-table">
-        <thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Role</th><th>Store status</th><th>Joined</th><th>Actions</th></tr></thead>
         <tbody>
           ${list.map((u) => `
             <tr>
@@ -318,9 +477,13 @@
               <td>${esc(u.email)}</td>
               <td>${esc(u.full_name)}</td>
               <td>${esc(u.role)}</td>
+              <td>${esc(u.store_status || 'none')}</td>
               <td>${new Date(u.created_at).toLocaleDateString()}</td>
               <td>
                 <button type="button" class="btn btn-secondary btn-sm edit-user" data-id="${u.id}">Edit</button>
+                ${u.role === 'store'
+                  ? `<button type="button" class="btn btn-sm ${u.store_status === 'locked' ? 'btn-primary' : 'btn-danger'} toggle-store-lock" data-id="${u.id}" data-locked="${u.store_status === 'locked' ? '1' : '0'}">${u.store_status === 'locked' ? 'Mở khóa shop' : 'Khóa shop'}</button>`
+                  : ''}
                 ${u.role !== 'admin' ? `<button type="button" class="btn btn-danger btn-sm delete-user" data-id="${u.id}">Delete</button>` : ''}
               </td>
             </tr>
@@ -328,6 +491,12 @@
         </tbody>
       </table>
     `;
+    content.querySelectorAll('.user-filter').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        window.__adminUserRoleFilter = btn.dataset.role;
+        loadPage('users');
+      });
+    });
     content.querySelectorAll('.edit-user').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.id;
@@ -337,10 +506,10 @@
         const role = row.cells[3].textContent;
         const newName = prompt('Full name', name);
         if (newName === null) return;
-        const newRole = prompt('Role (user/admin)', role);
+        const newRole = prompt('Role (user/store/admin)', role);
         if (newRole === null) return;
-        if (!['user', 'admin'].includes(newRole)) {
-          alert('Role must be user or admin');
+        if (!['user', 'store', 'admin'].includes(newRole)) {
+          alert('Role must be user, store or admin');
           return;
         }
         api.put('/admin/users/' + id, { full_name: newName, role: newRole }).then(() => loadPage('users')).catch((e) => alert(e.message));
@@ -350,6 +519,20 @@
       btn.addEventListener('click', () => {
         if (!confirm('Delete this user?')) return;
         api.delete('/admin/users/' + btn.dataset.id).then(() => loadPage('users')).catch((e) => alert(e.message));
+      });
+    });
+    content.querySelectorAll('.toggle-store-lock').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const currentlyLocked = btn.dataset.locked === '1';
+        const ok = confirm(currentlyLocked ? 'Mở khóa cửa hàng này?' : 'Khóa cửa hàng này?');
+        if (!ok) return;
+        try {
+          await api.put('/admin/users/' + id + '/store-lock', { locked: !currentlyLocked });
+          loadPage('users');
+        } catch (e) {
+          alert(e.message || 'Không cập nhật được trạng thái khóa shop');
+        }
       });
     });
   }
@@ -396,6 +579,193 @@
     `;
     content.querySelector('#btn-refresh-voucher').addEventListener('click', () => loadPage('vouchers'));
     content.querySelector('#btn-new-voucher').addEventListener('click', () => openVoucherModal());
+  }
+
+  async function renderStoreRequestsHistory() {
+    const statusFilter = String(window.__adminStoreReqStatus || 'all');
+    const [res, pendingRes] = await Promise.all([
+      api.get('/admin/store-requests/history' + (statusFilter === 'all' ? '' : ('?status=' + encodeURIComponent(statusFilter)))),
+      api.get('/admin/store-requests').catch(() => ({ requests: [] })),
+    ]);
+    const list = res.requests || [];
+    const pendingFullMap = new Map((pendingRes.requests || []).map((r) => [r.payment_id, r]));
+    const statusLabel = {
+      pending: 'pending',
+      approved: 'đồng ý',
+      rejected: 'hủy',
+      cancelled: 'cancelled/expired',
+    };
+    content.innerHTML = `
+      <h1>Lịch sử request mở shop</h1>
+      <div class="card" style="padding:16px; margin-bottom:12px;">
+        <h2 style="margin:0 0 8px; font-size:18px;">Yêu cầu chờ duyệt (${pendingRes.requests?.length || 0})</h2>
+        ${(pendingRes.requests || []).length ? `
+          <table class="admin-table">
+            <thead><tr><th>User ID</th><th>Email</th><th>Tên shop</th><th>Mã</th><th>Thời điểm user nhấn thanh toán</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${(pendingRes.requests || []).map((r) => `
+                <tr>
+                  <td>${esc(r.user?.id || '-')}</td>
+                  <td>${esc(r.user?.email || '-')}</td>
+                  <td>${esc(r.shop?.shop_name || '-')}</td>
+                  <td>${esc(r.payment_code || '-')}</td>
+                  <td>${r.user_marked_paid_at ? new Date(r.user_marked_paid_at).toLocaleString() : '-'}</td>
+                  <td><button type="button" class="btn btn-secondary btn-sm open-review-request" data-id="${r.payment_id}">Xem đầy đủ</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : '<p class="text-secondary" style="margin:0;">Không có yêu cầu pending.</p>'}
+      </div>
+      <div class="card" style="padding:12px; margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <strong>Lọc trạng thái:</strong>
+        <button type="button" class="btn btn-sm ${statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'} req-filter" data-status="all">Tất cả</button>
+        <button type="button" class="btn btn-sm ${statusFilter === 'pending' ? 'btn-primary' : 'btn-secondary'} req-filter" data-status="pending">pending</button>
+        <button type="button" class="btn btn-sm ${statusFilter === 'approved' ? 'btn-primary' : 'btn-secondary'} req-filter" data-status="approved">đồng ý</button>
+        <button type="button" class="btn btn-sm ${statusFilter === 'rejected' ? 'btn-primary' : 'btn-secondary'} req-filter" data-status="rejected">hủy</button>
+        <button type="button" class="btn btn-sm ${statusFilter === 'cancelled' ? 'btn-primary' : 'btn-secondary'} req-filter" data-status="cancelled">cancelled</button>
+      </div>
+      <table class="admin-table">
+        <thead><tr><th>User ID</th><th>Email</th><th>Tên shop</th><th>Mã</th><th>Trạng thái</th><th>User nhấn thanh toán</th><th>Admin xử lý</th></tr></thead>
+        <tbody>
+          ${list.map((r) => `
+            <tr>
+              <td>${esc(r.user?.id || '-')}</td>
+              <td>${esc(r.user?.email || '-')}</td>
+              <td>${esc(r.shop?.shop_name || '-')}</td>
+              <td>${esc(r.payment_code || '-')}</td>
+              <td>${esc(statusLabel[r.request_status] || r.request_status || '-')}</td>
+              <td>${r.user_marked_paid_at ? new Date(r.user_marked_paid_at).toLocaleString() : '-'}</td>
+              <td>${r.admin_reviewed_at ? new Date(r.admin_reviewed_at).toLocaleString() : '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    content.querySelectorAll('.req-filter').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        window.__adminStoreReqStatus = btn.dataset.status;
+        loadPage('store-requests-history');
+      });
+    });
+    content.querySelectorAll('.open-review-request').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const request = pendingFullMap.get(btn.dataset.id);
+        if (!request) return alert('Không tìm thấy hồ sơ chi tiết');
+        openStoreRequestReviewModal(request, () => loadPage('store-requests-history'));
+      });
+    });
+  }
+
+  function openStoreRequestReviewModal(request, onDone) {
+    const shop = request.shop || {};
+    const fullAddress = [shop.detail_address, shop.ward, shop.district, shop.province].filter(Boolean).join(', ');
+    const termsText = shop.terms_accepted
+      ? `Đã đồng ý${shop.terms_accepted_at ? ' lúc ' + new Date(shop.terms_accepted_at).toLocaleString() : ''}`
+      : 'Chưa đồng ý';
+    modalBox.innerHTML = `
+      <h2 style="margin-bottom:14px;">Hồ sơ đăng ký cửa hàng</h2>
+      <form>
+        <div class="card" style="padding:12px; margin-bottom:10px; background:var(--bg,#f8fafc);">
+          <h3 style="font-size:14px; margin:0 0 10px;">Thông tin người đăng ký</h3>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">User ID</label>
+            <input class="form-input" value="${esc(request.user?.id || '-')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Email</label>
+            <input class="form-input" value="${esc(request.user?.email || '-')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Họ tên</label>
+            <input class="form-input" value="${esc(request.user?.full_name || '-')}" readonly>
+          </div>
+        </div>
+
+        <div class="card" style="padding:12px; margin-bottom:10px; background:var(--bg,#f8fafc);">
+          <h3 style="font-size:14px; margin:0 0 10px;">Thông tin cửa hàng</h3>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Tên shop</label>
+            <input class="form-input" value="${esc(shop.shop_name || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Mô tả</label>
+            <textarea class="form-textarea" rows="2" readonly>${esc(shop.description || '')}</textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Người gửi</label>
+            <input class="form-input" value="${esc(shop.sender_name || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Số điện thoại</label>
+            <input class="form-input" value="${esc(shop.sender_phone || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Địa chỉ lấy hàng</label>
+            <textarea class="form-textarea" rows="2" readonly>${esc(fullAddress)}</textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Đơn vị vận chuyển</label>
+            <input class="form-input" value="${esc((shop.shipping_providers || []).join(', '))}" readonly>
+          </div>
+        </div>
+
+        <div class="card" style="padding:12px; margin-bottom:10px; background:var(--bg,#f8fafc);">
+          <h3 style="font-size:14px; margin:0 0 10px;">Thông tin ngân hàng & thanh toán</h3>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Ngân hàng</label>
+            <input class="form-input" value="${esc(shop.bank_name || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Chủ tài khoản</label>
+            <input class="form-input" value="${esc(shop.bank_account_name || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Số tài khoản</label>
+            <input class="form-input" value="${esc(shop.bank_account_number || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Điều khoản nền tảng</label>
+            <input class="form-input" value="${esc(termsText)}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Mã thanh toán</label>
+            <input class="form-input" value="${esc(request.payment_code || '')}" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Thời điểm user nhấn thanh toán</label>
+            <input class="form-input" value="${esc(request.user_marked_paid_at ? new Date(request.user_marked_paid_at).toLocaleString() : '-')}" readonly>
+          </div>
+        </div>
+      </form>
+      <div class="mt-3" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" id="modal-approve-store">Đồng ý</button>
+        <button type="button" class="btn btn-danger" id="modal-reject-store">Từ chối</button>
+        <button type="button" class="btn btn-secondary" id="modal-close">Đóng</button>
+      </div>
+    `;
+    modalOverlay.classList.remove('hidden');
+    modalBox.querySelector('#modal-close')?.addEventListener('click', closeModal);
+    modalBox.querySelector('#modal-approve-store')?.addEventListener('click', async () => {
+      if (!confirm('Xác nhận ĐỒNG Ý duyệt mở shop cho yêu cầu này?')) return;
+      try {
+        await api.put('/admin/store-requests/' + request.payment_id + '/approve', {});
+        closeModal();
+        onDone && onDone();
+      } catch (e) {
+        alert(e.message || 'Duyệt thất bại');
+      }
+    });
+    modalBox.querySelector('#modal-reject-store')?.addEventListener('click', async () => {
+      if (!confirm('Xác nhận TỪ CHỐI yêu cầu mở shop này?')) return;
+      try {
+        await api.put('/admin/store-requests/' + request.payment_id + '/reject', {});
+        closeModal();
+        onDone && onDone();
+      } catch (e) {
+        alert(e.message || 'Từ chối thất bại');
+      }
+    });
   }
 
   function buildVoucherFormHtml() {

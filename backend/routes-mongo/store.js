@@ -11,6 +11,7 @@ router.post('/register', controller.registerShop);
 
 // Payment & OTP verification (mock)
 router.get('/payment/:payment_code', controller.paymentGet);
+router.post('/payment/verify-transfer', controller.paymentVerifyTransfer);
 router.post('/payment/simulate-success', controller.paymentSimulateSuccess);
 
 module.exports = router;

@@ -6,9 +6,10 @@ const ShopPayment = require('../../models/ShopPayment');
 const OTP_SECRET = process.env.JWT_SECRET || 'shopti-secret-key-change-in-production';
 
 const PLATFORM_BANK = {
-  bank_name: process.env.PLATFORM_BANK_NAME || 'Techcombank',
-  account_name: process.env.PLATFORM_BANK_ACCOUNT_NAME || 'ShopTi',
-  account_number: process.env.PLATFORM_BANK_ACCOUNT_NUMBER || '0123456789',
+  bank_name: process.env.PLATFORM_BANK_NAME || 'MBBank',
+  account_name: process.env.PLATFORM_BANK_ACCOUNT_NAME || 'Nguyen Van Tien',
+  account_number: process.env.PLATFORM_BANK_ACCOUNT_NUMBER || '68888888120903',
+  qr_image_url: process.env.PLATFORM_BANK_QR_IMAGE_URL || '/assets/ShopTiQR.png',
 };
 
 function genOtp6() {
@@ -30,6 +31,7 @@ function mapShopStatus(shopStatus) {
   if (shopStatus === 'active') return 'approved';
   if (shopStatus === 'pending_payment') return 'pending';
   if (shopStatus === 'rejected') return 'rejected';
+  if (shopStatus === 'locked') return 'locked';
   return 'none';
 }
 
@@ -252,8 +254,40 @@ async function paymentGet(req, res) {
       transfer_content: payment.transfer_content,
       otp_store_verified: payment.otp_store_verified,
       otp_phone_verified: payment.otp_phone_verified,
+      user_marked_paid_at: payment.user_marked_paid_at || null,
+      has_phone_otp: !!payment.phone_verification_otp_hash,
       bank_info: PLATFORM_BANK,
     },
+  });
+}
+
+async function paymentVerifyTransfer(req, res) {
+  const { payment_code, transfer_content } = req.body || {};
+  if (!payment_code) return res.status(400).json({ success: false, message: 'payment_code is required' });
+  if (!transfer_content) return res.status(400).json({ success: false, message: 'transfer_content is required' });
+
+  const payment = await ShopPayment.findOne({ payment_code, user: req.user.id }).exec();
+  if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
+  if (payment.status !== 'pending') return res.status(400).json({ success: false, message: 'Payment is not pending' });
+  if (payment.expires_at && payment.expires_at.getTime() < Date.now()) {
+    return res.status(400).json({ success: false, message: 'Payment code expired' });
+  }
+
+  const content = String(transfer_content).trim();
+  if (content !== String(payment.transfer_content || '').trim()) {
+    return res.status(400).json({ success: false, message: 'Nội dung chuyển khoản không đúng' });
+  }
+
+  const phoneOtp = genOtp6();
+  payment.phone_verification_otp_hash = hashOtp(phoneOtp);
+  payment.phone_otp_sent_at = new Date();
+  payment.user_marked_paid_at = new Date();
+  await payment.save();
+
+  return res.json({
+    success: true,
+    message: 'Đã xác nhận mã chuyển khoản. OTP #2 đã được gửi (demo).',
+    debug: { phone_verification_otp: phoneOtp },
   });
 }
 
@@ -271,6 +305,9 @@ async function paymentSimulateSuccess(req, res) {
   if (payment.expires_at && payment.expires_at.getTime() < Date.now()) {
     return res.status(400).json({ success: false, message: 'Payment code expired' });
   }
+  if (!payment.phone_verification_otp_hash) {
+    return res.status(400).json({ success: false, message: 'Vui lòng bấm "Tôi đã thanh toán" trước để nhận OTP #2' });
+  }
 
   const otp1Hash = hashOtp(store_registration_otp);
   const otp2Hash = hashOtp(phone_verification_otp);
@@ -283,29 +320,12 @@ async function paymentSimulateSuccess(req, res) {
 
   payment.otp_store_verified = true;
   payment.otp_phone_verified = true;
-  payment.status = 'paid';
-  payment.paid_at = new Date();
+  if (!payment.user_marked_paid_at) payment.user_marked_paid_at = new Date();
   await payment.save();
-
-  // Activate shop
-  payment.shop.status = 'active';
-  await payment.shop.save();
-
-  // Sync old user fields used by current UI
-  await User.findByIdAndUpdate(req.user.id, {
-    $set: {
-      store_name: payment.shop.shop_name,
-      store_description: payment.shop.description,
-      store_status: 'approved',
-    },
-  });
 
   res.json({
     success: true,
-    shop: {
-      store_name: payment.shop.shop_name,
-      store_status: 'approved',
-    },
+    message: 'Đã gửi yêu cầu, vui lòng chờ admin duyệt mở cửa hàng',
     payment: {
       payment_code: payment.payment_code,
       status: payment.status,
@@ -313,5 +333,5 @@ async function paymentSimulateSuccess(req, res) {
   });
 }
 
-module.exports = { me, apply, registerShop, paymentGet, paymentSimulateSuccess };
+module.exports = { me, apply, registerShop, paymentGet, paymentVerifyTransfer, paymentSimulateSuccess };
 

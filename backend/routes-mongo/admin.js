@@ -20,6 +20,11 @@ router.get('/users', controller.usersList);
 router.get('/users/:id', controller.usersGet);
 router.put('/users/:id', controller.usersUpdate);
 router.delete('/users/:id', controller.usersDelete);
+router.put('/users/:id/store-lock', controller.usersStoreLock);
+router.get('/store-requests', controller.storeRequestsList);
+router.get('/store-requests/history', controller.storeRequestsHistory);
+router.put('/store-requests/:id/approve', controller.storeRequestApprove);
+router.put('/store-requests/:id/reject', controller.storeRequestReject);
 
 router.get('/orders', controller.ordersList);
 router.get('/orders/:id', controller.ordersGet);

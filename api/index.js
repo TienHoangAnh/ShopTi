@@ -12,6 +12,12 @@ const cartByIdHandler = require('./cart/[id]');
 const ordersHandler = require('./orders/index');
 const orderByIdHandler = require('./orders/[id]');
 const orderCancelHandler = require('./orders/[id]/cancel');
+const storeMeHandler = require('./store/me');
+const storeApplyHandler = require('./store/apply');
+const storeRegisterHandler = require('./store/register');
+const storePaymentByCodeHandler = require('./store/payment/[payment_code]');
+const storePaymentVerifyTransferHandler = require('./store/payment/verify-transfer');
+const storePaymentSimulateSuccessHandler = require('./store/payment/simulate-success');
 const adminDashboardHandler = require('./admin/dashboard');
 const adminCategoriesHandler = require('./admin/categories');
 const adminProductsHandler = require('./admin/products/index');
@@ -20,6 +26,8 @@ const adminOrdersHandler = require('./admin/orders/index');
 const adminOrderByIdHandler = require('./admin/orders/[id]');
 const adminUsersHandler = require('./admin/users/index');
 const adminUserByIdHandler = require('./admin/users/[id]');
+const adminStoreRequestsHandler = require('./admin/store-requests/index');
+const adminStoreRequestApproveHandler = require('./admin/store-requests/[id]/approve');
 
 function normalizePath(input) {
   const raw = String(input || '').trim();
@@ -98,6 +106,19 @@ module.exports = async (req, res) => {
     }
   }
 
+  if (path === '/store/me' && method === 'GET') return storeMeHandler(req, res);
+  if (path === '/store/apply' && method === 'POST') return storeApplyHandler(req, res);
+  if (path === '/store/register' && method === 'POST') return storeRegisterHandler(req, res);
+  if (path === '/store/payment/verify-transfer' && method === 'POST') return storePaymentVerifyTransferHandler(req, res);
+  if (path === '/store/payment/simulate-success' && method === 'POST') return storePaymentSimulateSuccessHandler(req, res);
+  {
+    const m = path.match(/^\/store\/payment\/([^/]+)$/);
+    if (m && method === 'GET') {
+      addRouteParam(req, 'payment_code', m[1]);
+      return storePaymentByCodeHandler(req, res);
+    }
+  }
+
   if (path === '/admin/dashboard' && method === 'GET') return adminDashboardHandler(req, res);
   if (path === '/admin/categories' && method === 'GET') return adminCategoriesHandler(req, res);
 
@@ -125,6 +146,15 @@ module.exports = async (req, res) => {
     if (m && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
       addRouteParam(req, 'id', m[1]);
       return adminUserByIdHandler(req, res);
+    }
+  }
+
+  if (path === '/admin/store-requests' && method === 'GET') return adminStoreRequestsHandler(req, res);
+  {
+    const m = path.match(/^\/admin\/store-requests\/([^/]+)\/approve$/);
+    if (m && method === 'PUT') {
+      addRouteParam(req, 'id', m[1]);
+      return adminStoreRequestApproveHandler(req, res);
     }
   }
 

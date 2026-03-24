@@ -17,15 +17,16 @@ const shopPaymentSchema = new mongoose.Schema(
 
     // OTP hashes (demo generates + returns codes to client; real app should SMS them)
     store_registration_otp_hash: { type: String, required: true },
-    phone_verification_otp_hash: { type: String, required: true },
+    phone_verification_otp_hash: { type: String, default: null },
 
     otp_store_verified: { type: Boolean, default: false },
     otp_phone_verified: { type: Boolean, default: false },
+    phone_otp_sent_at: { type: Date, default: null },
+    user_marked_paid_at: { type: Date, default: null },
+    admin_reviewed_at: { type: Date, default: null },
   },
   { timestamps: true }
 );
-
-shopPaymentSchema.index({ payment_code: 1 });
 
 module.exports = mongoose.models.ShopPayment || mongoose.model('ShopPayment', shopPaymentSchema);
 

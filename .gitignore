@@ -29,3 +29,6 @@ backend/database/*.db-journal
 .vscode/
 *.swp
 *.swo
+
+# Docs
+*.md

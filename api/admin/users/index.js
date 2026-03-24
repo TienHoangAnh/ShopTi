@@ -14,7 +14,11 @@ module.exports = async (req, res) => {
     const adminCheck = requireAdmin(auth.user);
     if (adminCheck.error) return res.status(adminCheck.error.status).json({ success: false, message: adminCheck.error.message });
 
-    const users = await User.find().select('_id email full_name role createdAt').sort({ createdAt: -1 }).lean();
+    const roleFilter = String(req.query?.role || '').trim().toLowerCase();
+    const query = {};
+    if (['user', 'store', 'admin'].includes(roleFilter)) query.role = roleFilter;
+
+    const users = await User.find(query).select('_id email full_name role store_status createdAt').sort({ createdAt: -1 }).lean();
     res.json({
       success: true,
       users: users.map((u) => ({
@@ -22,6 +26,7 @@ module.exports = async (req, res) => {
         email: u.email,
         full_name: u.full_name,
         role: u.role,
+        store_status: u.store_status || 'none',
         created_at: u.createdAt,
       })),
     });

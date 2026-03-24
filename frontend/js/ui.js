@@ -17,10 +17,16 @@ const ui = {
       el.classList.toggle('hidden', !auth.isAdmin());
     });
   },
+  showStoreOnly() {
+    document.querySelectorAll('[data-store-only]').forEach((el) => {
+      el.classList.toggle('hidden', !auth.isStore());
+    });
+  },
   updateNav() {
     ui.showAuthOnly();
     ui.showGuestOnly();
     ui.showAdminOnly();
+    ui.showStoreOnly();
     const cartCount = document.querySelector('[data-cart-count]');
     if (cartCount && typeof cart.getCount === 'function') {
       cart.getCount().then((n) => {

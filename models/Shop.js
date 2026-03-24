@@ -22,11 +22,13 @@ const shopSchema = new mongoose.Schema(
     bank_account_name: { type: String, required: true },
     bank_account_number: { type: String, required: true },
     bank_name: { type: String, required: true },
+    terms_accepted: { type: Boolean, default: false },
+    terms_accepted_at: { type: Date, default: null },
 
     status: {
       type: String,
       required: true,
-      enum: ['pending_payment', 'active', 'rejected'],
+      enum: ['pending_payment', 'active', 'rejected', 'locked'],
       default: 'pending_payment',
     },
     applied_at: { type: Date, default: null },
